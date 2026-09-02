@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ecommerce-db-secret
+type: Opaque
+stringData:
+  root-password: ogtechpass
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ecommerce-db-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ecommerce-db
+  template:
+    metadata:
+      labels:
+        app: ecommerce-db
+    spec:
+      containers:
+        - name: ecommerce-db
+          image: mariadb:10.4
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-db-secret
+                  key: root-password
+            - name: MARIADB_DATABASE
+              value: ogtech
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: database-data
+              mountPath: /var/lib/mysql
+            - name: database-script
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: database-data
+          persistentVolumeClaim:
+            claimName: ecommerce-db-data
+        - name: database-script
+          configMap:
+            name: ogtech-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  selector:
+    app: ecommerce-db
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-web
+  template:
+    metadata:
+      labels:
+        app: ecommerce-web
+    spec:
+      containers:
+        - name: ecommerce-web
+          image: hector.azurecr.io/mvc-ecommerce:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-web
+spec:
+  type: LoadBalancer
+  selector:
+    app: ecommerce-web
+  ports:
+    - port: 80
+      targetPort: 80
