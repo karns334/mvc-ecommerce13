@@ -1,0 +1,29 @@
+services:
+  web:
+    build: .
+    container_name: ecommerce-web
+    ports:
+      - "8081:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mariadb:10.4
+    container_name: ecommerce-db
+    environment:
+      MARIADB_ROOT_PASSWORD: ogtechpass
+      MARIADB_DATABASE: ogtech
+    volumes:
+      - ecommerce-data:/var/lib/mysql
+      - ./ogtech.sql:/docker-entrypoint-initdb.d/ogtech.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pogtechpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  ecommerce-data:
